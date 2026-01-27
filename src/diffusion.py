@@ -15,7 +15,7 @@ class Diffusion:
         self, x_0: torch.Tensor, t: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         noise = torch.randn_like(x_0, device=self.device)
-        input_batch_size = x_0.shape[0]
+        input_batch_size = x_0.size(0)
         alphas_bar_t = self.schedule.get_alphas_bar()[t].to(self.device)
         return torch.sqrt(alphas_bar_t).view(input_batch_size, 1, 1, 1) * x_0.to(
             self.device

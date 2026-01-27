@@ -38,7 +38,7 @@ def train(
             current_batch_size = batch.size(0)
             n_channels = batch.size(1)
             img_size = batch.size(2)
-            t = torch.randint(low=0, high=T, size=(current_batch_size,), device="cpu")
+            t = torch.randint(low=1, high=T, size=(current_batch_size,), device="cpu")
 
             noisy_image, noise = diffusion.q(batch, t)
 
@@ -63,7 +63,7 @@ def train(
         train_losses.append(train_loss)
 
         print(f"Epoch: {epoch + 1} | Training Loss: {train_loss:.5f}")
-        torch.save(model.state_dict(), f"model_epoch_{epoch + 1}.pt")
+        torch.save(model.state_dict(), "model.pt")
 
         if epoch % 20 == 0 or epoch == n_epochs - 1:
             model.eval()

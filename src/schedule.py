@@ -12,11 +12,11 @@ class NoiseSchedule(ABC):
         return self.timestamps
 
     @abstractmethod
-    def get_betas() -> torch.Tensor:
+    def get_betas(self) -> torch.Tensor:
         pass
 
     @abstractmethod
-    def get_alphas_bar() -> torch.Tensor:
+    def get_alphas_bar(self) -> torch.Tensor:
         pass
 
 
@@ -27,7 +27,7 @@ class LinearSchedule(NoiseSchedule):
         self.beta_end = beta_end
 
     def get_betas(self) -> torch.Tensor:
-        return torch.linspace(self.beta_start, self.beta_end, self.timestamps)
+        return torch.linspace(self.beta_start, self.beta_end, self.timestamps + 1)
 
     def get_alphas_bar(self) -> torch.Tensor:
         alpha = 1 - self.get_betas()
@@ -49,13 +49,12 @@ class CosineSchedule(NoiseSchedule):
         )
 
     def get_betas(self) -> torch.Tensor:
-        t = torch.linspace(0, self.timestamps, self.timestamps + 1)
-        f_0 = np.cos(0.5 * np.pi * self.offset / (1 + self.offset)) ** 2
-        alphas_bar = self.f(t) / f_0
-        betas = 1 - alphas_bar[1:] / alphas_bar[:-1]
-        return torch.clip(betas, 0.0, 0.9999)  # Preventing singularities
+        alphas_bar = self.get_alphas_bar()
+        betas = torch.zeros(self.timestamps + 1)
+        betas[1:] = 1 - alphas_bar[1:] / alphas_bar[:-1]
+        return torch.clip(betas, 0.0, 0.999)
 
     def get_alphas_bar(self) -> torch.Tensor:
-        t = torch.linspace(1, self.timestamps, self.timestamps)
+        t = torch.linspace(0, self.timestamps, self.timestamps + 1)
         f_0 = np.cos(0.5 * np.pi * self.offset / (1 + self.offset)) ** 2
         return self.f(t) / f_0
