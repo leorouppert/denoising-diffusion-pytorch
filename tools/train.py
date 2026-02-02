@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 
-from scripts import sample
+from tools import sample
 from src import diffusion
 
 
@@ -65,12 +65,12 @@ def train(
         print(f"Epoch: {epoch + 1} | Training Loss: {train_loss:.5f}")
         torch.save(model.state_dict(), "model.pt")
 
-        if epoch % 20 == 0 or epoch == n_epochs - 1:
+        if (epoch + 1) % max(1, (n_epochs // 10)) == 0 or epoch == n_epochs - 1:
             model.eval()
             print("Sampling...")
             samples.append(
                 (
-                    epoch,
+                    epoch + 1,
                     sample.sample_images(
                         model,
                         schedule,
