@@ -3,7 +3,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange
 
 
 def sinusoidal_positional_encoding(t, d_model):
@@ -60,23 +59,17 @@ class ConvResBlock(nn.Module):
 class Attention(nn.Module):
     def __init__(self, C: int, num_heads: int, dropout_prob: float):
         super().__init__()
-        self.proj1 = nn.Linear(C, C * 3)
-        self.proj2 = nn.Linear(C, C)
-        self.num_heads = num_heads
-        self.dropout_prob = dropout_prob
+        self.mha = nn.MultiheadAttention(
+            embed_dim=C, num_heads=num_heads, dropout=dropout_prob, batch_first=True
+        )
 
     def forward(self, x):
-        h, w = x.shape[2:]
-        x = rearrange(x, "b c h w -> b (h w) c")
-        x = self.proj1(x)
-        x = rearrange(x, "b L (C H K) -> K b H L C", K=3, H=self.num_heads)
-        q, k, v = x[0], x[1], x[2]
-        x = F.scaled_dot_product_attention(
-            q, k, v, is_causal=False, dropout_p=self.dropout_prob
-        )
-        x = rearrange(x, "b H (h w) C -> b h w (C H)", h=h, w=w)
-        x = self.proj2(x)
-        return rearrange(x, "b h w C -> b C h w")
+        B, C, H, W = x.shape
+        x = x.flatten(2)
+        x = x.transpose(1, 2)
+        x, _ = self.mha(x, x, x, need_weights=False)
+        x = x.transpose(1, 2).view(B, C, H, W)
+        return x
 
 
 class UNetBlock(nn.Module):
