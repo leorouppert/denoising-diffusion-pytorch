@@ -143,21 +143,21 @@ class UNetWithPosition(nn.Module):
         self.decoder4 = UNetBlock(
             False,
             base_channels * (8 + 8),
-            base_channels * (8 + 8),
+            base_channels * 8,
             embedding_dim,
             groups,
         )
         self.decoder3 = UNetBlock(
             True,
-            base_channels * (8 + 4),
-            base_channels * (8 + 4),
+            base_channels * (4 + 4),
+            base_channels * 4,
             embedding_dim,
             groups,
         )
         self.decoder2 = UNetBlock(
             False,
-            base_channels * (6 + 2),
-            base_channels * (6 + 2),
+            base_channels * (2 + 2),
+            base_channels * 2,
             embedding_dim,
             groups,
         )
@@ -166,17 +166,17 @@ class UNetWithPosition(nn.Module):
             base_channels * 16, base_channels * 8, kernel_size=4, stride=2, padding=1
         )
         self.up3 = nn.ConvTranspose2d(
-            base_channels * 16, base_channels * 8, kernel_size=4, stride=2, padding=1
+            base_channels * 8, base_channels * 4, kernel_size=4, stride=2, padding=1,
         )
         self.up2 = nn.ConvTranspose2d(
-            base_channels * 12, base_channels * 6, kernel_size=4, stride=2, padding=1
+            base_channels * 4, base_channels * 2, kernel_size=4, stride=2, padding=1
         )
         self.up1 = nn.ConvTranspose2d(
-            base_channels * 8, base_channels * 4, kernel_size=4, stride=2, padding=1
+            base_channels * 2, base_channels, kernel_size=4, stride=2, padding=1
         )
 
         self.final_conv = nn.Sequential(
-            nn.Conv2d(base_channels * 5, base_channels, kernel_size=3, padding=1),
+            nn.Conv2d(base_channels * 2, base_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(base_channels, out_channels, kernel_size=1),
         )
