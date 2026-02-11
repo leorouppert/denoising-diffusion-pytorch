@@ -40,7 +40,7 @@ class CosineSchedule(NoiseSchedule):
         super().__init__(timestamps)
         self.offset = offset
 
-    def f(self, t: int):
+    def f(self, t: torch.Tensor):
         return (
             torch.cos(
                 0.5 * np.pi * (t / self.timestamps + self.offset) / (1 + self.offset)

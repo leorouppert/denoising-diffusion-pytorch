@@ -1,8 +1,8 @@
 import torch
 from torch.utils.data import DataLoader
 
-from tools import sample
 from src import diffusion
+from tools import sample
 
 
 def train(
@@ -29,6 +29,8 @@ def train(
     n_channels = None
     img_size = None
 
+    device_type_str = device.type if isinstance(device, torch.device) else device
+
     for epoch in range(n_epochs):
         train_loss = 0
 
@@ -38,14 +40,18 @@ def train(
             current_batch_size = batch.size(0)
             n_channels = batch.size(1)
             img_size = batch.size(2)
-            t = torch.randint(low=1, high=T, size=(current_batch_size,), device="cpu")
+            t = torch.randint(
+                low=1, high=T + 1, size=(current_batch_size,), device="cpu"
+            )
 
             noisy_image, noise = diffusion.q(batch, t)
 
             optimizer.zero_grad()
 
             with torch.autocast(
-                device_type="cuda", dtype=autocast_dtype, enabled=use_mixed_precision
+                device_type=device_type_str,
+                dtype=autocast_dtype,
+                enabled=use_mixed_precision,
             ):
                 output = model(noisy_image, t.to(device=device))
                 loss = criterion(output, noise)

@@ -1,7 +1,6 @@
 import os
 
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
@@ -48,9 +47,9 @@ def display_images(image_list, rows, cols, save=False):
                 img = img.cpu().numpy()
 
             if img.shape[0] == 3:
-                ax.imshow(np.permute_dims(img, (1, 2, 0)))
+                ax.imshow(img.transpose(1, 2, 0))
             elif img.shape[0] == 1:
-                ax.imshow(np.permute_dims(img, (1, 2, 0)), cmap="gray")
+                ax.imshow(img.transpose(1, 2, 0), cmap="gray")
             elif img.shape[2] == 3:
                 ax.imshow(img)
             elif img.shape[2] == 1:

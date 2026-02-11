@@ -19,12 +19,12 @@ def sample_images(
     alphas_bar = schedule.get_alphas_bar()
 
     model.eval()
-    for i in tqdm(range(T - 1, -1, -1)):
+    for i in tqdm(range(T, 0, -1)):
         with torch.no_grad():
             z = torch.randn_like(x, device=device)
             t = torch.full((n_images,), fill_value=i, dtype=torch.int, device=device)
 
-            if i > 0:
+            if i > 1:
                 posterior_variance = betas[i]
             else:
                 posterior_variance = 0.0

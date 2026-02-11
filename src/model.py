@@ -24,13 +24,16 @@ class ConvResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, embedding_dim, groups, dropout):
         super().__init__()
 
-        self.block = nn.Sequential(
+        self.block1 = nn.Sequential(
             nn.GroupNorm(groups, in_channels),
-            nn.ReLU(inplace=True),
+            nn.SiLU(),
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+        )
+
+        self.block2 = nn.Sequential(
             nn.Dropout(p=dropout, inplace=True),
             nn.GroupNorm(groups, out_channels),
-            nn.ReLU(inplace=True),
+            nn.SiLU(),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
         )
 
@@ -42,16 +45,20 @@ class ConvResBlock(nn.Module):
 
         self.embedding_dim = embedding_dim
 
-    def forward(self, x, time):
-        pos_emb = sinusoidal_positional_encoding(time, self.embedding_dim)
-        pos_emb = pos_emb[:, : x.size(1), None, None]
+        self.time_proj = nn.Linear(embedding_dim, out_channels)
 
-        x = x + pos_emb
+    def forward(self, x, time_emb):
+        time_emb = self.time_proj(F.silu(time_emb))
+        time_emb = time_emb[:, :, None, None]
 
         residual = self.res_conv(x)
 
-        x = self.block(x) + residual
-        x = F.relu(x)
+        x = self.block1(x)
+        x = x + time_emb
+        x = self.block2(x)
+
+        x = x + residual
+        x = F.silu(x)
 
         return x
 
@@ -101,11 +108,11 @@ class UNetBlock(nn.Module):
             Attention(out_channels, 8, dropout) if attention else nn.Identity()
         )
 
-    def forward(self, x, time):
+    def forward(self, x, time_emb):
         x = self.conv(x)
-        x = self.block1(x, time)
+        x = self.block1(x, time_emb)
         x = self.attention(x)
-        x = self.block2(x, time)
+        x = self.block2(x, time_emb)
 
         return x
 
@@ -117,9 +124,17 @@ class UNetWithPosition(nn.Module):
         out_channels,
         base_channels=64,
         groups=64 // 2,
-        embedding_dim=64 * 16,
+        embedding_dim=64 * 4,
     ):
         super().__init__()
+
+        self.embedding_dim = embedding_dim
+
+        self.time_mlp = nn.Sequential(
+            nn.Linear(embedding_dim, embedding_dim),
+            nn.SiLU(),
+            nn.Linear(embedding_dim, embedding_dim),
+        )
 
         self.encoder1 = UNetBlock(
             False, in_channels, base_channels, embedding_dim, groups
@@ -166,7 +181,11 @@ class UNetWithPosition(nn.Module):
             base_channels * 16, base_channels * 8, kernel_size=4, stride=2, padding=1
         )
         self.up3 = nn.ConvTranspose2d(
-            base_channels * 8, base_channels * 4, kernel_size=4, stride=2, padding=1,
+            base_channels * 8,
+            base_channels * 4,
+            kernel_size=4,
+            stride=2,
+            padding=1,
         )
         self.up2 = nn.ConvTranspose2d(
             base_channels * 4, base_channels * 2, kernel_size=4, stride=2, padding=1
@@ -177,24 +196,27 @@ class UNetWithPosition(nn.Module):
 
         self.final_conv = nn.Sequential(
             nn.Conv2d(base_channels * 2, base_channels, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
+            nn.SiLU(),
             nn.Conv2d(base_channels, out_channels, kernel_size=1),
         )
 
     def forward(self, x, time):
+        time_emb = sinusoidal_positional_encoding(time, self.embedding_dim)
+        time_emb = self.time_mlp(time_emb)
+
         # Encoder
-        enc1 = self.encoder1(x, time)
-        enc2 = self.encoder2(self.pool(enc1), time)
-        enc3 = self.encoder3(self.pool(enc2), time)
-        enc4 = self.encoder4(self.pool(enc3), time)
+        enc1 = self.encoder1(x, time_emb)
+        enc2 = self.encoder2(self.pool(enc1), time_emb)
+        enc3 = self.encoder3(self.pool(enc2), time_emb)
+        enc4 = self.encoder4(self.pool(enc3), time_emb)
 
         # Bottleneck
-        middle = self.bottleneck(self.pool(enc4), time)
+        middle = self.bottleneck(self.pool(enc4), time_emb)
 
         # Decoder
-        dec4 = self.decoder4(torch.cat((self.up4(middle), enc4), dim=1), time)
-        dec3 = self.decoder3(torch.cat((self.up3(dec4), enc3), dim=1), time)
-        dec2 = self.decoder2(torch.cat((self.up2(dec3), enc2), dim=1), time)
+        dec4 = self.decoder4(torch.cat((self.up4(middle), enc4), dim=1), time_emb)
+        dec3 = self.decoder3(torch.cat((self.up3(dec4), enc3), dim=1), time_emb)
+        dec2 = self.decoder2(torch.cat((self.up2(dec3), enc2), dim=1), time_emb)
         dec1 = torch.cat((self.up1(dec2), enc1), dim=1)
 
         out = self.final_conv(dec1)
